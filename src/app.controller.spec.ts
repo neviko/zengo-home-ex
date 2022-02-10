@@ -1,22 +1,52 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
+import { INestApplication } from '@nestjs/common';
+import * as request from 'supertest';
+import { AppModule } from './../src/app.module';
 
-describe('AppController', () => {
-  let appController: AppController;
+describe('AppController (e2e)', () => {
+  let app: INestApplication;
 
   beforeEach(async () => {
-    const app: TestingModule = await Test.createTestingModule({
-      controllers: [AppController],
-      providers: [AppService],
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
     }).compile();
 
-    appController = app.get<AppController>(AppController);
+    app = moduleFixture.createNestApplication();
+    await app.init();
   });
 
-  describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
-    });
+  it('should be failed v1- missing coins query param', () => {
+    return request(app.getHttpServer())
+      .get('/coins-compare?date=2019-07-21')
+      .expect(400)
   });
+  it('should be failed v2- missing date query param', () => {
+    return request(app.getHttpServer())
+      .get('/coins-compare?coins=ETH,BTC,IMX')
+      .expect(400)
+  });
+  it('should success - capital letters', () => {
+    return request(app.getHttpServer())
+      .get('/coins-compare?coins=ETH,BTC,IMX&date=2019-07-21')
+      .expect(200)
+  });
+  it('should success - small letters', () => {
+    return request(app.getHttpServer())
+      .get('/coins-compare?coins=eth,btc,imx&date=2019-07-21')
+      .expect(200)
+  });
+
+  it('should failed - future date', () => {
+    return request(app.getHttpServer())
+      .get('/coins-compare?coins=eth,btc,imx&date=2024-01-15')
+      .expect(400)
+  });
+
+  it('should success - past date', () => {
+    return request(app.getHttpServer())
+      .get('/coins-compare?coins=eth,btc,imx&date=2020-01-15')
+      .expect(200)
+  });
+
+
 });

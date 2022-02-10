@@ -15,10 +15,28 @@ describe('AppController (e2e)', () => {
     await app.init();
   });
 
-  it('/ (GET)', () => {
+  it('should be failed v1- missing coins query param', () => {
     return request(app.getHttpServer())
-      .get('/')
-      .expect(200)
+      .get('/coins-compare?date=2019-07-21')
+      .expect(400)
+      .expect('Hello World!');
+  });
+  it('should be failed v2- missing date query param', () => {
+    return request(app.getHttpServer())
+      .get('/coins-compare?coins=ETH,BTC,IMX')
+      .expect(400)
+      .expect('Hello World!');
+  });
+  it('should success - capital letters', () => {
+    return request(app.getHttpServer())
+      .get('/coins-compare?coins=ETH,BTC,IMX&date=2019-07-21')
+      .expect(400)
+      .expect('Hello World!');
+  });
+  it('should success - small letters', () => {
+    return request(app.getHttpServer())
+      .get('/coins-compare?coins=eth,btc,imx&date=2019-07-21')
+      .expect(400)
       .expect('Hello World!');
   });
 });

@@ -3,12 +3,18 @@ import { HttpService } from '@nestjs/axios';
 import { lastValueFrom } from 'rxjs';
 import { CoinDiffDTO } from './dto/coinDiff.dto';
 import * as moment from 'moment';
+import { ConfigService } from 'nestjs-dotenv';
 
 const BASE_URL = 'https://min-api.cryptocompare.com';
 
 @Injectable()
 export class AppService {
-  constructor(private httpService: HttpService) {}
+  constructor(
+    private httpService: HttpService,
+    private readonly configService: ConfigService
+    ) {
+      console.log(this.configService.get('SECRET_KEY'))
+    }
 
   async getCoinsPercentagesDiff({ coins, date }: CoinDiffDTO) {
     if (!this.dateValidator(date)) {
