@@ -14,10 +14,13 @@ const common_1 = require("@nestjs/common");
 const axios_1 = require("@nestjs/axios");
 const rxjs_1 = require("rxjs");
 const moment = require("moment");
+const nestjs_dotenv_1 = require("nestjs-dotenv");
 const BASE_URL = 'https://min-api.cryptocompare.com';
 let AppService = class AppService {
-    constructor(httpService) {
+    constructor(httpService, configService) {
         this.httpService = httpService;
+        this.configService = configService;
+        console.log(this.configService.get('SECRET_KEY'));
     }
     async getCoinsPercentagesDiff({ coins, date }) {
         if (!this.dateValidator(date)) {
@@ -35,8 +38,7 @@ let AppService = class AppService {
                 },
             }));
             if (!data || data.Data) {
-                throw new common_1.BadRequestException(`Error message:${data.Message}
-          something went wrong while getting old data, please validate your request `);
+                throw new common_1.BadRequestException(data.Message);
             }
             return data;
         }
@@ -45,21 +47,29 @@ let AppService = class AppService {
         }
     }
     async getPastCoinValues(date, coins) {
-        try {
-            const { data } = await (0, rxjs_1.lastValueFrom)(this.httpService.get(`${BASE_URL}/data/daily/market/close?date=${date}`, {
-                headers: {
-                    Authorization: `Apikey ${process.env.SECRET_KEY}`,
-                },
-            }));
-            if (typeof data !== 'string') {
-                throw new common_1.BadRequestException(`Error message:${data.Message}`);
+        let response;
+        const timestamp = new Date(date).getTime();
+        coins = coins.toUpperCase();
+        const coinsArr = coins.split(',');
+        for (const coin of coinsArr) {
+            try {
+                const { data } = await (0, rxjs_1.lastValueFrom)(this.httpService.get(`${BASE_URL}/data/pricehistorical?fsym=${coin}&tsyms=USD&ts=${timestamp}`, {
+                    headers: {
+                        Authorization: `Apikey ${process.env.SECRET_KEY}`,
+                    },
+                }));
+                if (!data || data.Data) {
+                    response = Object.assign(Object.assign({}, response), { [coin]: data.Message });
+                }
+                else {
+                    response = Object.assign(Object.assign({}, response), data);
+                }
             }
-            const coinsArr = coins.split(',');
-            return this.filterByCoinName(data.split('\n'), coinsArr);
+            catch (e) {
+                throw new common_1.InternalServerErrorException(e.message);
+            }
         }
-        catch (e) {
-            throw new common_1.BadRequestException(e.message);
-        }
+        return response;
     }
     dateValidator(date) {
         return (moment(date, 'YYYY-MM-DD', true).isValid() &&
@@ -80,12 +90,12 @@ let AppService = class AppService {
     }
     getPriceDiff(curr, past) {
         const diffs = {};
-        Object.keys(curr).forEach((coin) => {
+        Object.keys(past).forEach((coin) => {
             var _a, _b;
             const currPrice = (_a = curr[coin]) === null || _a === void 0 ? void 0 : _a.USD;
             const pastPrice = (_b = past[coin]) === null || _b === void 0 ? void 0 : _b.USD;
             if (!pastPrice) {
-                diffs[coin] = 'No historical data';
+                diffs[coin] = past[coin];
             }
             else {
                 diffs[coin] =
@@ -97,7 +107,8 @@ let AppService = class AppService {
 };
 AppService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [axios_1.HttpService])
+    __metadata("design:paramtypes", [axios_1.HttpService,
+        nestjs_dotenv_1.ConfigService])
 ], AppService);
 exports.AppService = AppService;
 //# sourceMappingURL=app.service.js.map

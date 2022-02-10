@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { lastValueFrom } from 'rxjs';
 import { CoinDiffDTO } from './dto/coinDiff.dto';
@@ -39,10 +39,7 @@ export class AppService {
         ),
       );
       if (!data || data.Data) {
-        throw new BadRequestException(
-          `Error message:${data.Message}
-          something went wrong while getting old data, please validate your request `,
-        );
+        throw new BadRequestException(data.Message);
       }
       return data;
     } catch (e) {
@@ -51,27 +48,39 @@ export class AppService {
   }
 
   // yyyy-mm-dd format only
-  async getPastCoinValues(date, coins): Promise<string[]> {
-    try {
-      const { data } = await lastValueFrom(
-        this.httpService.get(
-          `${BASE_URL}/data/daily/market/close?date=${date}`,
-          {
-            headers: {
-              Authorization: `Apikey ${process.env.SECRET_KEY}`,
-            },
-          },
-        ),
-      );
+  async getPastCoinValues(date, coins): Promise<any> {
+    let response
+      const timestamp = new Date(date).getTime()
+      coins = coins.toUpperCase()
+      const coinsArr = coins.split(',')
 
-      if (typeof data !== 'string') {
-        throw new BadRequestException(`Error message:${data.Message}`);
+
+      for (const coin of coinsArr) {
+        try{
+          const { data } = await lastValueFrom(
+            this.httpService.get(
+              `${BASE_URL}/data/pricehistorical?fsym=${coin}&tsyms=USD&ts=${timestamp}`,
+              {
+                headers: {
+                  Authorization: `Apikey ${process.env.SECRET_KEY}`,
+                },
+              },
+            ),
+          );
+    
+          if (!data || data.Data) {
+            response = {...response,...{[coin]:data.Message}}          
+          }
+          else{
+            response = {...response,...data}
+          }
+          
+        }
+        catch(e){
+          throw new InternalServerErrorException(e.message)
+        }      
       }
-      const coinsArr = coins.split(',');
-      return this.filterByCoinName(data.split('\n'), coinsArr);
-    } catch (e) {
-      throw new BadRequestException(e.message);
-    }
+      return response
   }
 
   dateValidator(date): boolean {
@@ -99,11 +108,11 @@ export class AppService {
 
   getPriceDiff(curr, past) {
     const diffs = {};
-    Object.keys(curr).forEach((coin) => {
+    Object.keys(past).forEach((coin) => {
       const currPrice = curr[coin]?.USD;
       const pastPrice = past[coin]?.USD;
       if (!pastPrice) {
-        diffs[coin] = 'No historical data';
+        diffs[coin] =past[coin]
       } else {
         diffs[coin] =
           (((currPrice - pastPrice) / currPrice) * 100).toFixed(2) + '%';
