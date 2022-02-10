@@ -13,7 +13,6 @@ export class AppService {
     private httpService: HttpService,
     private readonly configService: ConfigService
     ) {
-      console.log(this.configService.get('SECRET_KEY'))
     }
 
   async getCoinsPercentagesDiff({ coins, date }: CoinDiffDTO) {
